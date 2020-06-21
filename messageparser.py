@@ -3,11 +3,14 @@ from stepper import Stepper
 from timewizard import TimeWizard
 from lamp import Lamp
 from pump import Pump
+import ujson
 
+#                       send               answer
 # aquarium/feeder       feed, 1000
 # aquarium/add_alarm    15:10, feed
 # aquarium/del_alarm    15:20, daylight
-# aquarium/get_alarms   15:10,feed; 15:20, daylight; 15:30, nightlight; 15:40, offlight
+# aquarium/alarms       show               15:10,feed; 15:20, daylight; 15:30, nightlight; 15:40, offlight
+#                       save
 # aquarium/lamp         daylight or nightlight or offlight
 # aquarium/pump         pump_on, pump_off
 # aquarium/status       daylight, last feed at 15:20
@@ -27,16 +30,19 @@ class MessageParser:
             config.OFFLIGHT_LABEL: self._lamp.offlight,
             config.PUMP_ON_LABEL: self._pump.on,
             config.PUMP_OFF_LABEL: self._pump.off,
+            config.ALARMS_SHOW_LABEL: self._show_alarms,
+            config.ALARMS_SAVE_LABEL: self._save_alarms
             }
         self._funcs = {
             b'/'.join((config.TOP_TOPIC, config.FEEDER_TOPIC)): self.feed,
             b'/'.join((config.TOP_TOPIC, config.ADD_ALARM_TOPIC)): self.add_alarm,
             b'/'.join((config.TOP_TOPIC, config.DEL_ALARM_TOPIC)): self.del_alarm,
-            b'/'.join((config.TOP_TOPIC, config.GET_ALARMS_TOPIC)): self.get_alarms,
+            b'/'.join((config.TOP_TOPIC, config.ALARMS_TOPIC)): self.alarms,
             b'/'.join((config.TOP_TOPIC, config.LAMP_TOPIC)): self.set_lamp,
             b'/'.join((config.TOP_TOPIC, config.STATUS_TOPIC)): self.get_status,
             b'/'.join((config.TOP_TOPIC, config.PUMP_TOPIC)): self.set_pump,
             }
+        self._load_alarms()
         self._tw.start()
         
         
@@ -92,10 +98,31 @@ class MessageParser:
         self._tw.del_alarm(*args)
     
     
-    def get_alarms(self, msg):
+    def alarms(self, msg):
+        if msg in (config.ALARMS_SHOW_LABEL, config.ALARMS_SAVE_LABEL):
+            self._alarm_actions[msg]()
+    
+    
+    def _show_alarms(self):
         alarms = self._tw.get_alarms()
         print( b'; '.join((b'{:02}:{:02}, {:s}'.format(*alarm) for alarm in alarms)))
+    
+    
+    def _save_alarms(self):
+        alarms = self._tw.get_alarms()
+        data = [(hour, minute, label.decode('utf-8')) for hour, minute, label in alarms]
+        with open(config.SETTINGS_FILE, 'w') as f:
+            ujson.dump(data, f)
+        print("Settings is saved")
+    
+    def _load_alarms(self):
+        with open(config.SETTINGS_FILE, 'r') as f:
+            data = ujson.load(f)
         
+        for item in data:
+            hour, minute, label = item
+            self._tw.add_alarm(hour, minute, label.encode('utf-8'), self._alarm_actions[label.encode('utf-8')])
+    
 
     def _prepare_timer_args(self, msg):
         args = msg.split(b',')

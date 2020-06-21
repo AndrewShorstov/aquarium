@@ -11,6 +11,7 @@ class TimeWizard:
         self._last_alarm = dict()
         self._last_hour = 0
         self._synced = False
+        self._set_missed = False
         self.sync()
     
     
@@ -30,8 +31,8 @@ class TimeWizard:
     def del_alarm(self, hour, minute, label, callback=None):
         time = hour*60+minute
         if time in self._alarms and label in self._alarms[time]:
-            del self._alarms[label][time]
-            if self._alarms[time].isEmpty:
+            del self._alarms[time][label]
+            if len(self._alarms[time]) == 0:
                 del self._alarms[time]
             print("Alarm for {:s} at {:02}:{:02} has been removed".format(label, hour, minute))
     
@@ -44,6 +45,10 @@ class TimeWizard:
         return alarms
 
 
+    def synced(self):
+        return self._synced
+
+
     def sync(self):
         try:
             ntptime.settime()
@@ -51,6 +56,44 @@ class TimeWizard:
             print("Sync RTC {}".format(self._rtc.datetime()))
         except OSError:
             print("Error during syncing")
+    
+    
+    def _set_missed_alarms(self):
+        min_time = {config.DAYLIGHT_LABEL:None, config.NIGHTLIGHT_LABEL: None, config.PUMP_ON_LABEL: None}
+        current_hour, current_minute = self.time()
+        current_time = current_hour*60 + current_minute
+        for time, actions in self._alarms.items():
+            print(actions)
+            if config.DAYLIGHT_LABEL in actions:
+                if min_time[config.DAYLIGHT_LABEL] is None:
+                    min_time[config.DAYLIGHT_LABEL] = time
+                    continue
+                min_time[config.DAYLIGHT_LABEL] = self._min_dist(current_time, time, min_time[config.DAYLIGHT_LABEL])
+            if config.NIGHTLIGHT_LABEL in actions:
+                if min_time[config.NIGHTLIGHT_LABEL] is None:
+                    min_time[config.NIGHTLIGHT_LABEL] = time
+                    continue
+                min_time[config.NIGHTLIGHT_LABEL] = self._min_dist(current_time, time, min_time[config.NIGHTLIGHT_LABEL])
+            if config.PUMP_ON_LABEL in actions:
+                if min_time[config.PUMP_ON_LABEL] is None:
+                    min_time[config.PUMP_ON_LABEL] = time
+                    continue
+                min_time[config.PUMP_ON_LABEL] = self._min_dist(current_time, time, min_time[config.PUMP_ON_LABEL])
+        print(min_time)
+        for label, time in min_time.items():
+            if time is not None:
+                self._alarms[time][label]["cb"]() 
+        self._set_missed = True
+                
+                
+    def _min_dist(self, current, new, old):
+        day = 24*60
+        old_dist = (day + current - old)%day
+        new_dist = (day + current - new)%day
+        if new_dist < old_dist:
+            return new
+        else:
+            return old
     
     
     def stop(self):
@@ -70,6 +113,9 @@ class TimeWizard:
 
           
     def _check_alarms(self, t):
+#         if self._synced and not self._set_missed:
+#             self._set_missed_alarms()
+
         if not self._synced:
             print("Trying to sync ...")
             self.sync()

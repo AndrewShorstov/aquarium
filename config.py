@@ -1,6 +1,9 @@
 import ubinascii
 import machine
 
+## Alarm settings file
+SETTINGS_FILE = "settings.json"
+
 # Default MQTT server to connect to
 SERVER = "192.168.1.100"
 CLIENT_ID = ubinascii.hexlify(machine.unique_id())
@@ -11,12 +14,12 @@ FEEDER_TOPIC = b'feeder'
 LAMP_TOPIC = b'lamp'
 ADD_ALARM_TOPIC = b'add_alarm'
 DEL_ALARM_TOPIC = b'del_alarm'
-GET_ALARMS_TOPIC = b'get_alarms'
+ALARMS_TOPIC = b'alarms'
 PUMP_TOPIC = b'pump'
 STATUS_TOPIC = b'status'
 
-LABELS = (b'feed', b'daylight', b'nightlight', b'offlight', b'status', b'pump_on', b'pump_off')
-FEEDER_LABEL, DAYLIGHT_LABEL, NIGHTLIGHT_LABEL, OFFLIGHT_LABEL, STATUS_LABEL, PUMP_ON_LABEL, PUMP_OFF_LABEL = LABELS
+LABELS = (b'feed', b'daylight', b'nightlight', b'offlight', b'status', b'pump_on', b'pump_off', b'show', b'save')
+FEEDER_LABEL, DAYLIGHT_LABEL, NIGHTLIGHT_LABEL, OFFLIGHT_LABEL, STATUS_LABEL, PUMP_ON_LABEL, PUMP_OFF_LABEL, ALARMS_SHOW_LABEL, ALARMS_SAVE_LABEL = LABELS
 
 ## Feeder settings
 FEEDER_SPEED = 1000
